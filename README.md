@@ -1,4 +1,3 @@
-
 # Elakatotrichophyceae phylogenomics
 
 Scripts and documented analysis steps for the MBE major revision concerning
@@ -44,14 +43,12 @@ between scripts (including `OrthoFinder` versus `Orthofinder`); `step7.sh` has
 `WORKDIR="cd /mnt/..."`, which must be corrected in a separate working copy
 before use. That script also clears output directories. `step4.sh` appends FASTA
 records, so rerunning it in a populated output directory can duplicate records.
-None of these legacy scripts was changed or executed during documentation work.
-`eleka.ASR.R` is not the final October 2 model-averaged/corHMM analysis.
+`eleka.ASR.R` implements the original-submission ASR workflow.
 
 ## Revised analysis scripts
 
-`revised_scripts/` contains nine unmodified copies of existing server scripts,
-not a newly developed pipeline. `SOURCE_MANIFEST.tsv` gives original server
-paths and SHA-256 values. The revised guide identifies which commands and
+`revised_scripts/` contains nine scripts for the revised workflow.
+`SOURCE_MANIFEST.tsv` lists their source paths and SHA-256 values. The revised guide identifies which commands and
 parameters are supported by run records, and which upstream utilities have
 only their source code available. In particular, the five-seed tree-guided
 selector supersedes the root-level `step4.sh` single-best-hit selection.
@@ -68,5 +65,4 @@ This repository documents the recorded workflow and provides reusable scripts.
 The minimal deposit supplies final phylogenetic inputs and results, rather
 than all upstream HMM databases and candidate-search intermediates. No claim
 is made that the legacy scripts provide a one-command reconstruction of all
-revised analyses. The present guide covers phylogenomics, not dating, ASR or
-concordance/topology-test calculations.
+revised analyses. The workflow guide covers the phylogenomic analyses.

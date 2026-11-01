@@ -5,7 +5,7 @@ Elakatotrichophyceae. The repository URL retains its historical spelling,
 `Elakatophyceae-Phylogenomics`; the formal class name is **Elakatotrichophyceae**.
 
 The revised phylogenetic dataset contains **68 taxa, 388 loci and 130,892
-aligned amino-acid sites**. See [the revised workflow](WORKFLOW_REVISED_388LOCI.md)
+aligned amino-acid sites**. See [the revised workflow](WORKFLOW_REVISED_388LOCI.txt)
 for the actual selection, alignment, concatenation and tree-inference stages.
 
 ## Data and code
@@ -48,7 +48,7 @@ records, so rerunning it in a populated output directory can duplicate records.
 ## Revised analysis scripts
 
 `revised_scripts/` contains nine scripts for the revised workflow.
-`SOURCE_MANIFEST.tsv` lists their source paths and SHA-256 values. The revised guide identifies which commands and
+`SOURCE_MANIFEST.xlsx` lists their source paths and SHA-256 values. The revised guide identifies which commands and
 parameters are supported by run records, and which upstream utilities have
 only their source code available. In particular, the five-seed tree-guided
 selector supersedes the root-level `step4.sh` single-best-hit selection.

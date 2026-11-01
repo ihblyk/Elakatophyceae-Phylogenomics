@@ -1,0 +1,179 @@
+Revised 68-taxon and 388-locus workflow
+
+This guide describes the analysis scripts and recorded settings for the revised
+dataset. Adapt the paths and use fresh output directories before running the
+scripts. Shell wrappers contain original absolute paths.
+
+1. Inputs and protein homology
+
+The workflow starts from prepared per-sample protein FASTAs and existing
+OrthoFinder orthogroup/seed sequences. The legacy step1.sh consumes
+Orthogroups.tsv; it does not run OrthoFinder or DIAMOND. The root scripts
+also do not implement raw-read assembly or protein prediction. Therefore
+no undocumented invocation or historical software version is assigned to
+those upstream stages.
+
+The revised upstream HMM script 01_hmmsearch_all_candidates.sh searches the
+478-profile SOG_5of5_1copy_478.hmmdb with --cpu 2 --noali --notextw -E 1e-5
+--domE 1e-5, retaining tabular/domain outputs. Its original input directory
+is named phylogenomics_69_pep. The later active analysis excludes
+SRR9052848_cdhit and uses 68 taxa; the older directory name is not its final
+sample count.
+
+02_build_tree_candidate_fasta.py and revised_multihit_orthology.py are
+copied upstream candidate-preparation utilities. The former reads
+all_candidate_domain_coverage.tsv, seed FASTAs and proteins; its source
+constants are HMM coverage >=0.50, full E-value <=1e-10 and relative bitscore
+>=0.50. The general utility has separate configurable defaults. These source
+defaults are not asserted to be the final 68-taxon invocation. Candidate
+audit tables and active input membership are the evidence for a specific run.
+The original HMM database, seed proteins and full candidate collection are
+not part of the minimal Zenodo release.
+
+2. Candidate screening and five-seed selection
+
+Historical run root (abbreviated as BASE below):
+
+BASE=/mnt/sdb/Revised.ele/05_68taxa_seedanchored_rerun_excluding_SRR9052848_v1
+SEL="$BASE/05_seed_anchored_selection"
+
+02_candidate_screen_parameters.tsv records 68 active taxa, MAFFT --auto,
+trimAl -automated1 -fasta, and candidate ML gene trees under LG+F+G4 without
+bootstrap. logs/01_candidate_screen.log records 478 candidate trees and zero
+failed loci.
+
+The existing selector is select_seed_anchored_tree_candidates.py. Inputs are
+the candidate audit, locus candidate FASTAs, candidate ML trees, n_taxa=68,
+min_taxa=55 and these five fixed seed OTUs:
+
+Charabraunii_cdhit
+Chlorokybusatmophyticus_cdhit
+ERR3487426_cdhit
+Mesostigmaviride_cdhit
+SRR5949008_cdhit
+
+Its actual interface uses --candidate-audit, --tree-dir, --fasta-dir,
+--out-dir, --n-taxa, --min-taxa and repeated --seed arguments. Every
+retained non-seed candidate in the locus ML tree is compared. The sort key
+in the copied code is median distance to the five seeds, then mean distance,
+HMM rank, negative bitscore and header for deterministic ties. The main
+selection criterion is median patristic distance, not the first HMM hit.
+
+Outputs are raw_selected_ge_threshold/*.fas, sequence_selection_audit.tsv,
+locus_selection_audit.tsv, selection_parameters.tsv and
+selected_loci_pre_realign.txt. logs/02_continuation.log records 478
+evaluated -> 417 eligible loci. The inspected audit files report 23,091
+non-seed selections in the final retained loci, including 3,603 multi-candidate
+comparisons and 1,010 selections differing from HMM rank 1. This describes
+tree-guided sequence selection, not a separate duplication-aware audit.
+
+3. Realignment, trimming and the final locus set
+
+run_realign_treeguided_selection.sh consumes the selected FASTAs, runs
+MAFFT --auto, then trimAl -gt 0.75 -resoverlap 0.75 -seqoverlap 70.
+The final 68-taxon settings are N_TAXA=68, MIN_TAXA=55, MIN_ALN_LEN=100.
+The wrapper's inherited defaults are 69/56, so its defaults must not be used
+to describe this final run. Its interface is:
+
+N_TAXA=68 MIN_TAXA=55 MIN_ALN_LEN=100 \
+  bash revised_scripts/run_realign_treeguided_selection.sh "$SEL"
+
+This is an invocation with the recorded dataset settings, not a recovered
+verbatim shell-history line. Logs record 417 realigned loci and 388 final
+loci. At least 55/68 samples and at least 100 aligned aa are required;
+duplicate headers are rejected. Outputs are 02_mafft/, 03_trimal/,
+04_final_ge80_len100/, realign_filter_audit.tsv and
+final_loci_ge80_len100.txt.
+
+4. Concatenation and gene trees
+
+Zenodo's sequence ZIP supplies 04_final_ge80_len100/,
+supermatrix_68taxa_388loci.fas, and metadata/ containing taxa order, final
+locus IDs, the partition file and locus-partition audit.
+
+build_supermatrix_tcp_start.py accepts --alignments, --constraint-tree,
+--outdir, --expected-loci 388 and --expected-taxa 68. It orders loci by
+filename and taxa by the supplied tree, fills absent taxon/locus blocks with
+gaps, and writes FASTA/PHYLIP matrices, NEXUS partitions, taxa order,
+locus_partition_audit.tsv and a rooted start topology. The original build
+tree is an additional input, not a file supplied in the minimal sequence ZIP.
+The build log records 388 loci, 68 taxa and 130,892 sites. Final FASTA SHA-256:
+
+10f9f1877a8cb76eaafc508fe1c581ad85c2dc9e3b8205110d278dfa77bf9298
+
+run_final_gene_trees.sh "$SEL" consumes the final alignments and writes
+05_final_gene_trees_MFP/*.treefile and .contree, with:
+
+-m MFP -mset LG,WAG,JTT,Q.pfam,Q.plant
+-bb 1000 -alrt 1000 -bnni -T <IQ_THREADS>
+
+The continuation log records 388/388 completed gene trees and two threads/job.
+The wrapper writes results and is not an inspection command. Gene trees
+can differ from the species tree; do not modify their relationships to match it.
+
+5. Formal species-tree analyses
+
+Method | Recorded inputs/settings | Final deposited output
+C60 | Full matrix; LG+C60+F+G; PTC hard constraint; UFBoot 1000, bnni, aLRT 1000; seed 20260913 | primary/C60_TCPstart_PTChardconstraint.scientific_names.contree
+ASTRAL | 388 gene trees after UFBoot <25 collapse; primary v5.7.8 without a constraint | primary/astral_ufboot25_unconstrained_v5.7.8.tree
+Partitioned ML | Full matrix and locus partitions; selected locus models; PTC constraint | primary/partitioned_selected_MF_Gamma_TCPstart_PTChardconstraint.scientific_names.contree
+GHOST H4 | Full matrix; four latent branch-length classes; PTC constraint | primary/ghost_H4_TCPstart_PTChardconstraint_safe.scientific_names.contree
+
+The C60 final log records IQ-TREE 2.4.0 and the following command, with
+only its common path prefix abbreviated. It includes -g; the earlier
+run_c60_tcp_start.sh without -g does not represent this final run.
+
+/home/ps/local/share/mamba/envs/qtp18s_iqtree2_240/bin/iqtree2 \
+  -s "$BASE/07_concatenated_supermatrix_68taxa_tcp_start/supermatrix_68taxa_388loci.fas" \
+  -m 'LG+C60+F+G' \
+  -t "$BASE/07_concatenated_supermatrix_68taxa_tcp_start/TCP_start_tree_Rhodophyta_rooted_68taxa.nwk" \
+  -g "$BASE/07_concatenated_supermatrix_68taxa_tcp_start/PTC_hard_monophyly_constraint_68taxa.nwk" \
+  -o SRR12352384_cdhit,SRR10150610_cdhit,SRR6023957_cdhit \
+  -B 1000 --bnni -alrt 1000 -T 72 --seed 20260913 \
+  --prefix "$BASE/08_iqtree_C60_TCPstart_PTChardconstraint/C60_TCPstart_PTChardconstraint" --redo
+
+The PTC constraint targets Pithophora roettleri, Trentepohlia annulata and
+Chlorocladiella medogensis. The original start and constraint trees must be
+provided to reuse that command. It writes output; do not run it over archived results.
+
+prepare_astral_collapsed_gene_trees.py takes --tree-dir, --out-dir,
+--out-combined, --out-audit and --threshold 25. The inherited helper's
+output suffix says collapsed35; the wrapper explicitly renames it to the
+actual collapsed25 threshold. run_astral_ufboot25_tcp.sh documents both
+versions and the main command:
+
+java -Xmx96G -jar /home/ps/ASTRAL/Astral/astral.5.7.8.jar \
+  -i "$SEL/06_astral_ufboot25_tcp_constraint/gene_trees_ufboot25.tre" \
+  -o "$SEL/06_astral_ufboot25_tcp_constraint/astral_ufboot25_unconstrained_v5.7.8.tree" -t 3
+
+The v5.6.9 -j run is a separate constrained analysis and is not substituted
+for the main unconstrained v5.7.8 tree. The wrapper also waits for a completion
+marker and contains original absolute paths; read it before adapting it.
+
+The inspected local records identify the final partitioned and GHOST products
+but do not supply their complete original launch commands. GHOST provenance
+points to the second server's /home/jiaoz/huanzhu/eleka_reanalysis_68taxa_tcp_start/.
+The deposited trees are available for inspection; the complete original launch
+commands for these two searches are not included in the available scripts.
+
+6. Final files, names and reuse
+
+Use the revised phylogenetic tree ZIP and TREE_INDEX.xlsx for final
+Figure 1/S-PHY2 and Figure 2A results. The 65-taxon ASTRAL outgroup tree is
+PTC-constrained; the 48-taxon source is named ASTRAL_rooted.tree, and its
+name alone does not verify constraint status. Tree formats are listed in the
+index because some .contree files are NEXUS files with annotations.
+Final trees use author-confirmed tip identities. FJFC is Elakatothrix gelatinosa,
+XSBN25082 is Spirotaenia sp., and ERR364381 is Spirotaenia minuta. Do not
+indiscriminately exchange these sample IDs when reusing deposited alignments.
+
+Dependencies with verified historical versions are listed in README. Python
+and Biopython support FASTA and Newick processing; Java runs ASTRAL. HMMER,
+MAFFT and trimAl are required by the relevant stages. Their exact historical
+versions are not established by the inspected run records. Historical parallel
+job counts are machine-specific, not recommended resource settings.
+
+The scripts and deposited inputs document the phylogenomic workflow. Repeating
+all stages also requires the upstream HMM libraries, candidate-search inputs,
+C60 starting and constraint trees, and the original launch records for the
+partitioned and GHOST analyses.
